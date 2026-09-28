@@ -53,7 +53,7 @@
                                 </button>
                             </td>
                             @foreach ($fields as $key => $label)
-                                <td @class(['p-3', 'min-w-64 whitespace-pre-wrap' => in_array($key, ['particulars', 'store']), 'whitespace-nowrap' => !in_array($key, ['particulars', 'store']), 'tabular-nums' => in_array($key, ['qty', 'amount', 'total'])])>{{ $record->$key }}</td>
+                                <td @class(['p-3', 'min-w-64 whitespace-pre-wrap' => in_array($key, ['particulars', 'store']), 'whitespace-nowrap' => !in_array($key, ['particulars', 'store']), 'tabular-nums' => in_array($key, ['qty', 'amount'])])>{{ $record->$key }}</td>
                             @endforeach
                             @can('edit-data')
                                 <td class="p-3"><div class="flex items-center gap-3">
@@ -68,7 +68,7 @@
                             @endcan
                         </tr>
                     @empty
-                        <tr><td colspan="12" class="p-10 text-center text-gray-500 dark:text-gray-400">{{ __('No canvass records found.') }}</td></tr>
+                        <tr><td colspan="{{ count($fields) + 1 + (auth()->user()->can('edit-data') ? 1 : 0) }}" class="p-10 text-center text-gray-500 dark:text-gray-400">{{ __('No canvass records found.') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

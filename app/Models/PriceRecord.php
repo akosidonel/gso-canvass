@@ -11,20 +11,22 @@ class PriceRecord extends Model
     public const FIELDS = [
         'qty' => 'Qty',
         'unit' => 'Unit',
-        'brand_model' => 'Brand/Model',
         'particulars' => 'Particulars',
         'amount' => 'Amount',
-        'total' => 'Total',
         'department' => 'Department',
         'control_number' => 'Control number',
+        'brand_model' => 'Brand/Model',
         'store' => 'Store',
         'canvasser' => 'Canvasser',
     ];
 
-    protected $fillable = ['qty', 'unit', 'brand_model', 'particulars', 'amount', 'total', 'department', 'control_number', 'store', 'canvasser', 'fingerprint'];
+    // Keep stored duplicate fingerprints independent of the display column order.
+    public const FINGERPRINT_FIELDS = ['qty', 'unit', 'brand_model', 'particulars', 'amount', 'department', 'control_number', 'store', 'canvasser'];
+
+    protected $fillable = ['qty', 'unit', 'brand_model', 'particulars', 'amount', 'department', 'control_number', 'store', 'canvasser', 'fingerprint'];
 
     protected function casts(): array
     {
-        return ['qty' => 'decimal:3', 'amount' => 'decimal:2', 'total' => 'decimal:2'];
+        return ['qty' => 'decimal:3', 'amount' => 'decimal:2'];
     }
 }

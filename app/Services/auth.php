@@ -115,17 +115,15 @@ class PriceMonitoring
         try {
             DB::transaction(function () use ($rows, $id) {
                 foreach ($rows as $index => $data) {
-                    // Integer arithmetic keeps totals exact at three quantity decimals and two price decimals.
+                    // Normalize quantities and prices before computing the duplicate fingerprint.
                     $quantity = self::scaled($data['qty'], 3);
                     $amount = self::scaled($data['amount'], 2);
-                    $total = intdiv($quantity * $amount + 500, 1000);
                     $data['qty'] = self::decimal($quantity, 3);
                     $data['amount'] = self::decimal($amount, 2);
-                    $data['total'] = self::decimal($total, 2);
                     $data['brand_model'] = $data['brand_model'] ?? '';
                     $data['store'] = $data['store'] ?? '';
                     $identity = [];
-                    foreach (array_keys(PriceRecord::FIELDS) as $field) {
+                    foreach (PriceRecord::FINGERPRINT_FIELDS as $field) {
                         $identity[] = mb_strtolower(trim($data[$field]));
                     }
                     $data['fingerprint'] = hash('sha256', json_encode($identity, JSON_UNESCAPED_UNICODE));

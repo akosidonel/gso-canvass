@@ -1,3 +1,5 @@
+import { createPricePasteGrid } from './components/price-paste-grid.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-digits-only]').forEach((input) => {
         const sanitize = (value) => value.replace(/[^0-9]/g, '').slice(0, input.maxLength);
@@ -70,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Excel quotes cells containing tabs, line breaks, or quotation marks.
-export function parseExcelRows(text) {
+export function parseExcelRows(text, preserveEmptyRows = false) {
     const rows = [];
     let row = [], cell = '', quoted = false;
     const source = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -85,6 +87,10 @@ export function parseExcelRows(text) {
         } else cell += character;
     }
     row.push(cell); rows.push(row);
+    if (preserveEmptyRows) {
+        if (source.endsWith('\n')) rows.pop();
+        return rows;
+    }
     return rows.filter(row => row.some(value => value.trim() !== ''));
 }
 
@@ -92,16 +98,6 @@ export function priceNumber(value) {
     const text = String(value ?? '').trim();
     // Strip valid thousands groups only; malformed separators remain validation errors.
     return /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(text) ? text.replaceAll(',', '') : text;
-}
-
-export function priceTotal(qty, amount) {
-    if (!/^\d+(\.\d{1,3})?$/.test(qty) || !/^\d+(\.\d{1,2})?$/.test(amount)) return '';
-    const scaled = (value, places) => {
-        const [whole, fraction = ''] = value.split('.');
-        return BigInt(whole) * (10n ** BigInt(places)) + BigInt(fraction.padEnd(places, '0'));
-    };
-    const cents = (scaled(qty, 3) * scaled(amount, 2) + 500n) / 1000n;
-    return `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
 }
 
 export function excelCell(value) {
@@ -157,14 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const template = editor.querySelector('[data-row-template]');
     const fields = [...template.content.querySelectorAll('[data-field]')].map(input => input.dataset.field);
     const status = editor.querySelector('[data-editor-status]');
-    const source = editor.querySelector('[data-paste-source]');
     const save = editor.querySelector('[data-save-rows]');
     let dirty = false, saving = false;
     const renumber = () => [...body.children].forEach((row, index) => { row.querySelector('[data-row-number]').textContent = index + 1; });
-    const total = row => {
-        const input = key => row.querySelector(`[data-field="${key}"]`);
-        input('total').value = priceTotal(priceNumber(input('qty').value), priceNumber(input('amount').value));
-    };
     const addRow = (values = {}) => {
         const row = template.content.firstElementChild.cloneNode(true);
         row.querySelectorAll('[data-field]').forEach(input => {
@@ -172,25 +163,26 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', () => {
                 dirty = true; input.removeAttribute('aria-invalid');
                 input.classList.remove('ring-2', 'ring-error-500');
-                total(row);
             });
         });
         row.querySelector('[data-remove-row]')?.addEventListener('click', () => { row.remove(); dirty = true; renumber(); });
-        body.append(row); total(row);
+        body.append(row);
     };
     const initial = JSON.parse(editor.dataset.record);
     if (initial) { addRow(initial); renumber(); }
-    source?.addEventListener('input', () => { dirty = true; });
+    const pasteGrid = createPricePasteGrid(editor, fields, parseExcelRows, () => { dirty = true; }, error => {
+        status.textContent = translate(error === 'rows' ? 'Use at most 500 rows per batch.' : 'The pasted cells do not fit. Check the selected column order or start in an earlier column.');
+    });
     editor.querySelector('[data-add-row]')?.addEventListener('click', () => {
         if (body.children.length >= 500) { status.textContent = translate('Use at most 500 rows per batch.'); return; }
         addRow(); dirty = true; renumber();
     });
     editor.querySelector('[data-preview-paste]')?.addEventListener('click', () => {
-        const rows = parseExcelRows(source.value);
+        const rows = pasteGrid.getRows();
         if (!rows.length) { status.textContent = translate('Paste copied Excel rows first.'); return; }
         const workbook = editor.querySelector('[data-paste-layout]').value === 'workbook';
         const layout = workbook
-            ? ['qty', 'unit', 'particulars', 'amount', 'total', 'department', 'control_number', null, 'brand_model', 'canvasser', null, 'store']
+            ? ['qty', 'unit', 'particulars', 'amount', 'department', 'control_number', null, 'brand_model', 'canvasser', null, 'store']
             : fields;
         if (/^(qty(?:\s*1)?|quantity)$/i.test(rows[0][0].trim()) && /^(unit(?:s)?|qty\s*2)$/i.test(rows[0][1]?.trim() || '')) rows.shift();
         if (!rows.length) { status.textContent = translate('Paste copied Excel rows first.'); return; }
@@ -204,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             values.qty = priceNumber(values.qty); values.amount = priceNumber(values.amount);
             addRow(values);
         });
-        dirty = true; renumber(); source.value = '';
+        dirty = true; renumber(); pasteGrid.clear();
         status.textContent = translate('Preview ready. Review the rows before saving.');
     });
     save.addEventListener('click', async () => {
@@ -212,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = [...body.children].map(row => Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, ['qty', 'amount'].includes(input.dataset.field) ? priceNumber(input.value) : input.value.trim()])));
         if (!rows.length) { status.textContent = translate('No rows to save.'); return; }
         // Pending pasted content must be previewed before saving.
-        if (source?.value.trim()) { status.textContent = translate('Add the pasted rows to the preview before saving.'); return; }
+        if (pasteGrid?.hasContent()) { status.textContent = translate('Add the pasted rows to the preview before saving.'); return; }
         editor.querySelectorAll('[aria-invalid]').forEach(input => { input.removeAttribute('aria-invalid'); input.classList.remove('ring-2', 'ring-error-500'); });
         saving = true;
         const controls = [...editor.querySelectorAll('button, textarea, select')];

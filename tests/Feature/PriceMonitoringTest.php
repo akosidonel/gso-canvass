@@ -17,7 +17,7 @@ function priceRow(array $changes = []): array
 {
     return array_replace([
         'qty' => '2.125', 'unit' => 'pcs', 'brand_model' => 'Sample brand',
-        'particulars' => "Paper\nA4", 'amount' => '10.20', 'total' => '99999',
+        'particulars' => "Paper\nA4", 'amount' => '10.20',
         'department' => 'GSO', 'control_number' => '001-2026', 'store' => 'Sample store', 'canvasser' => 'Staff',
     ], $changes);
 }
@@ -36,17 +36,18 @@ test('canvassers can search and copy but cannot change records', function () {
     $this->delete('/price-monitoring/1')->assertForbidden();
 });
 
-test('TL can paste a batch and edit while totals are calculated on the server', function () {
+test('TL can paste a batch and edit without a total column', function () {
     $this->actingAs(priceActor('tl_canvasser'));
     $this->get('/price-monitoring/create')->assertOk()->assertSee('data-price-editor', false);
     $this->postJson('/price-monitoring', ['rows' => [priceRow(), priceRow(['particulars' => 'Second item'])]])->assertOk();
     $this->assertDatabaseCount('price_monitoring_records', 2);
-    $this->assertDatabaseHas('price_monitoring_records', ['id' => 1, 'total' => '21.68', 'control_number' => '001-2026']);
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('price_monitoring_records', 'total'))->toBeFalse();
+    $this->assertDatabaseHas('price_monitoring_records', ['id' => 1, 'qty' => '2.125', 'amount' => '10.20', 'control_number' => '001-2026']);
     $this->get('/price-monitoring?search=001-2026')->assertOk()->assertSee('Second item');
     $this->get('/price-monitoring?search=unmatched')->assertOk()->assertDontSee('Second item');
     $this->get('/price-monitoring/1/edit')->assertOk();
     $this->putJson('/price-monitoring/1', ['rows' => [priceRow(['qty' => '3'])]])->assertOk();
-    $this->assertDatabaseHas('price_monitoring_records', ['id' => 1, 'total' => '30.60']);
+    $this->assertDatabaseHas('price_monitoring_records', ['id' => 1, 'qty' => '3', 'amount' => '10.20']);
     $this->delete('/price-monitoring/1')->assertForbidden();
     $this->assertDatabaseCount('price_monitoring_records', 2);
 });
@@ -60,7 +61,7 @@ test('invalid batches save nothing and preserve valid zero prices', function () 
     $this->postJson('/price-monitoring', ['rows' => [priceRow(['department' => '', 'control_number' => ''])]])->assertUnprocessable();
     $this->postJson('/price-monitoring', ['rows' => array_fill(0, 501, priceRow())])->assertUnprocessable();
     $this->postJson('/price-monitoring', ['rows' => [priceRow(['amount' => '0', 'brand_model' => '', 'store' => ''])]])->assertOk();
-    $this->assertDatabaseHas('price_monitoring_records', ['total' => '0']);
+    $this->assertDatabaseHas('price_monitoring_records', ['amount' => '0']);
 });
 
 test('duplicates roll back the entire batch and editing the same record is allowed', function () {
@@ -79,4 +80,21 @@ test('invalid or inactive roles cannot access prices', function () {
     $user = priceActor('canvasser');
     $user->forceFill(['is_active' => false])->save();
     $this->actingAs($user)->get('/price-monitoring')->assertRedirect('/signin');
+});
+
+test('removing total preserves existing records and duplicate detection', function () {
+    $this->actingAs(priceActor('system_admin'));
+    $this->postJson('/price-monitoring', ['rows' => [priceRow()]])->assertOk();
+    $record = \App\Models\PriceRecord::firstOrFail();
+    $fingerprint = $record->fingerprint;
+    $migration = require database_path('migrations/2026_09_26_000001_remove_total_from_price_monitoring_records.php');
+    $migration->down();
+    $this->assertDatabaseHas('price_monitoring_records', ['id' => $record->id, 'total' => '21.68']);
+    $migration->up();
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('price_monitoring_records', 'total'))->toBeFalse();
+    $this->assertDatabaseHas('price_monitoring_records', ['id' => $record->id, 'fingerprint' => $fingerprint, 'control_number' => '001-2026']);
+    $this->postJson('/price-monitoring', ['rows' => [priceRow()]])->assertUnprocessable();
+    $this->assertDatabaseCount('price_monitoring_records', 1);
+    $this->get('/price-monitoring')->assertOk()->assertDontSee('>Total<', false);
+    $this->get('/price-monitoring/'.$record->id.'/edit')->assertOk()->assertDontSee('data-field="total"', false);
 });
