@@ -6,8 +6,7 @@
             <div class="mb-8 text-center">
                 <p class="text-2xl font-semibold tracking-tight text-brand-600 dark:text-brand-400 sm:text-title-sm">{{ __('GSO Monitoring') }}</p>
             </div>
-            <h1 id="login-title" class="text-title-sm font-semibold">{{ __('Sign in') }}</h1>
-            <p class="mb-8 mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __('Enter your employee number and password to access the system.') }}</p>
+            <h1 id="login-title" class="mb-8 text-title-sm font-semibold">{{ __('Sign in') }}</h1>
             @if ($errors->any())
                 <div id="login-errors" role="alert" class="mb-5 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{{ $errors->first() }}</div>
             @endif

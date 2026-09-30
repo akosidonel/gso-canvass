@@ -51,7 +51,9 @@ class PriceMonitoringController extends Controller
     {
         PriceMonitoring::delete($id, $request->user());
 
-        return redirect()->route('price-monitoring.index')->with('status', __('Record deleted.'));
+        return redirect()->route('price-monitoring.index')
+            ->with('status', __('Record deleted.'))
+            ->with('price_record_deleted', true);
     }
 
     private function form(?PriceRecord $record = null)

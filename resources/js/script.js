@@ -1,5 +1,19 @@
 import { createPricePasteGrid } from './components/price-paste-grid.js';
 
+const showPriceAlert = async options => {
+    const { default: Swal } = await import('sweetalert2');
+    return Swal.fire({
+        heightAuto: false,
+        buttonsStyling: false,
+        customClass: {
+            popup: 'price-save-alert',
+            confirmButton: 'rounded-lg bg-brand-500 px-5 py-3 text-sm font-medium text-white hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500',
+            cancelButton: 'ms-3 rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700',
+        },
+        ...options,
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-digits-only]').forEach((input) => {
         const sanitize = (value) => value.replace(/[^0-9]/g, '').slice(0, input.maxLength);
@@ -30,10 +44,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.querySelectorAll('[data-confirm-delete]').forEach((form) => {
-        form.addEventListener('submit', (event) => {
-            if (!window.confirm(form.dataset.confirmDelete)) event.preventDefault();
+        let confirming = false;
+        form.addEventListener('submit', async (event) => {
+            if (!form.dataset.deleteMessages) {
+                if (!window.confirm(form.dataset.confirmDelete)) event.preventDefault();
+                return;
+            }
+            event.preventDefault();
+            if (confirming) return;
+            confirming = true;
+            const messages = JSON.parse(form.dataset.deleteMessages);
+            try {
+                const result = await showPriceAlert({
+                    icon: 'warning',
+                    title: form.dataset.confirmDelete,
+                    text: messages.warning,
+                    showCancelButton: true,
+                    confirmButtonText: messages.confirm,
+                    cancelButtonText: messages.cancel,
+                    focusCancel: true,
+                });
+                if (result.isConfirmed) HTMLFormElement.prototype.submit.call(form);
+            } finally {
+                confirming = false;
+            }
         });
     });
+
+    const deleteSuccess = document.querySelector('[data-delete-success]');
+    if (deleteSuccess) {
+        showPriceAlert({
+            icon: 'success',
+            title: deleteSuccess.dataset.deleteSuccess,
+            text: deleteSuccess.textContent.trim(),
+            confirmButtonText: deleteSuccess.dataset.okLabel,
+        });
+    }
 
     const presence = document.querySelector('meta[name="presence-url"]');
     if (presence) {
@@ -207,10 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pasteGrid?.hasContent()) { status.textContent = translate('Add the pasted rows to the preview before saving.'); return; }
         editor.querySelectorAll('[aria-invalid]').forEach(input => { input.removeAttribute('aria-invalid'); input.classList.remove('ring-2', 'ring-error-500'); });
         saving = true;
-        const controls = [...editor.querySelectorAll('button, textarea, select')];
+        const controls = [...editor.querySelectorAll('button, input, textarea, select')];
         controls.forEach(input => { input.disabled = true; });
-        status.textContent = translate('Saving records…');
         try {
+            const confirmation = await showPriceAlert({
+                icon: 'question',
+                titleText: translate('Save records?'),
+                text: translate('Save :count record(s)?').replace(':count', rows.length),
+                showCancelButton: true,
+                confirmButtonText: translate('Yes, save records'),
+                cancelButtonText: translate('Cancel'),
+                focusCancel: true,
+            });
+            if (!confirmation.isConfirmed) return;
+            status.textContent = translate('Saving records…');
             const response = await fetch(editor.dataset.url, {
                 method: editor.dataset.method,
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
@@ -230,7 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 return;
             }
-            dirty = false; window.location.assign(result.redirect);
+            dirty = false;
+            status.textContent = translate('Canvass records saved.');
+            await showPriceAlert({
+                icon: 'success',
+                titleText: translate('Saved successfully'),
+                text: translate('Canvass records saved.'),
+                confirmButtonText: translate('OK'),
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+            });
+            window.location.assign(result.redirect);
         } catch { status.textContent = translate('Unable to save. Your rows are still here; check your connection and try again.'); }
         finally { saving = false; controls.forEach(input => { input.disabled = false; }); }
     });

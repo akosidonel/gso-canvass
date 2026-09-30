@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap') layer(base);
 @import 'prismjs/themes/prism.min.css';
 @import 'tailwindcss';
+@import 'sweetalert2/dist/sweetalert2.min.css';
 
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -1311,4 +1312,18 @@ pre code,
   direction: ltr !important;
   text-align: left !important;
   unicode-bidi: isolate;
+}
+
+/* Save dialogs follow the dashboard theme, including changes while open. */
+.swal2-popup.price-save-alert {
+  background: var(--color-white);
+  color: var(--color-gray-800);
+  font-family: var(--font-outfit);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-2xl);
+}
+.dark .swal2-popup.price-save-alert {
+  background: var(--color-gray-900);
+  color: var(--color-gray-200);
+  border-color: var(--color-gray-800);
 }

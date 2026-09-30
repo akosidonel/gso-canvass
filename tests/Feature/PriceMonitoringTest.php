@@ -72,8 +72,13 @@ test('duplicates roll back the entire batch and editing the same record is allow
     $this->postJson('/price-monitoring', ['rows' => [priceRow(['particulars' => 'New']), priceRow()]])->assertUnprocessable();
     $this->assertDatabaseCount('price_monitoring_records', 1);
     $this->putJson('/price-monitoring/1', ['rows' => [priceRow()]])->assertOk();
-    $this->delete('/price-monitoring/1')->assertRedirect('/price-monitoring');
+    $this->get('/price-monitoring')->assertOk()->assertSee('data-delete-messages', false);
+    $this->delete('/price-monitoring/1')->assertRedirect('/price-monitoring')
+        ->assertSessionHas('price_record_deleted', true)
+        ->assertSessionHas('status', __('Record deleted.'));
     $this->assertDatabaseCount('price_monitoring_records', 0);
+    $this->get('/price-monitoring')->assertOk()->assertSee('data-delete-success', false);
+    $this->get('/price-monitoring')->assertOk()->assertDontSee('data-delete-success', false);
 });
 
 test('invalid or inactive roles cannot access prices', function () {

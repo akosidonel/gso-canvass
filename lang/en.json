@@ -109,5 +109,13 @@
     "Canvass": "Canvass",
     "Clear cells": "Clear cells",
     "Click a cell and paste from Excel, or type directly. Tab moves across cells; Enter moves down. Shift + Enter adds a line within a cell.": "Click a cell and paste from Excel, or type directly. Tab moves across cells; Enter moves down. Shift + Enter adds a line within a cell.",
-    "The pasted cells do not fit. Check the selected column order or start in an earlier column.": "The pasted cells do not fit. Check the selected column order or start in an earlier column."
+    "The pasted cells do not fit. Check the selected column order or start in an earlier column.": "The pasted cells do not fit. Check the selected column order or start in an earlier column.",
+    "Save records?": "Save records?",
+    "Save :count record(s)?": "Save :count record(s)?",
+    "Yes, save records": "Yes, save records",
+    "Saved successfully": "Saved successfully",
+    "OK": "OK",
+    "This action cannot be undone.": "This action cannot be undone.",
+    "Yes, delete record": "Yes, delete record",
+    "Deleted successfully": "Deleted successfully"
 }

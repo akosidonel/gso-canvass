@@ -9,7 +9,7 @@
         </div>
     @endcan
     @if (session('status'))
-        <p role="status" class="mb-4 rounded-lg bg-brand-50 p-3 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{{ session('status') }}</p>
+        <p role="status" @if (session('price_record_deleted')) data-delete-success="{{ __('Deleted successfully') }}" data-ok-label="{{ __('OK') }}" @endif class="mb-4 rounded-lg bg-brand-50 p-3 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{{ session('status') }}</p>
     @endif
     @if ($errors->any())
         <p role="alert" class="mb-4 text-error-600 dark:text-error-400">{{ $errors->first() }}</p>
@@ -40,7 +40,7 @@
                     @forelse ($records as $record)
                         <tr>
                             <td class="p-3">
-                                <button type="button" data-copy-row="{{ json_encode(array_map(fn ($key) => $record->$key ?? '', array_keys($fields))) }}"
+                                <button type="button" data-copy-row="{{ json_encode(array_map(fn ($key) => $record->$key ?? '', ['qty', 'unit', 'particulars', 'amount'])) }}"
                                     aria-label="{{ __('Copy record :id', ['id' => $record->id]) }}" title="{{ __('Copy row to Excel') }}"
                                     class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-brand-500/15 dark:hover:text-brand-300">
                                     <svg data-copy-icon aria-hidden="true" class="h-5 w-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -59,7 +59,8 @@
                                 <td class="p-3"><div class="flex items-center gap-3">
                                     <a href="{{ route('price-monitoring.edit', $record->id) }}" class="text-brand-600 dark:text-brand-400">{{ __('Edit') }}</a>
                                     @can('delete-data')
-                                        <form method="POST" action="{{ route('price-monitoring.destroy', $record->id) }}" data-confirm-delete="{{ __('Delete this canvass record?') }}">
+                                        <form method="POST" action="{{ route('price-monitoring.destroy', $record->id) }}" data-confirm-delete="{{ __('Delete this canvass record?') }}"
+                                            data-delete-messages="{{ json_encode(['warning' => __('This action cannot be undone.'), 'confirm' => __('Yes, delete record'), 'cancel' => __('Cancel')]) }}">
                                             @csrf @method('DELETE')
                                             <button class="text-error-600 dark:text-error-400">{{ __('Delete') }}</button>
                                         </form>
