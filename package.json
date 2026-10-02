@@ -8,7 +8,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "build:watch": "vite build --watch"
+        "build:watch": "vite build --watch",
+        "version:sync": "node scripts/sync-app-version.mjs",
+        "prebuild": "npm run version:sync"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.1.12",

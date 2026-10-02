@@ -91,9 +91,11 @@ class UserAccounts
 
 class PriceMonitoring
 {
-    public static function listing(string $search, string $category = '')
+    public static function listing(string $search, string $category = '', bool $archived = false, ?int $year = null)
     {
         return PriceRecord::query()
+            ->when($archived, fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
+            ->when($year, fn ($query) => $query->where('created_at', '>=', $year.'-01-01')->where('created_at', '<', ($year + 1).'-01-01'))
             ->when($category !== '', fn ($query) => $query->where('category', $category))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -106,7 +108,10 @@ class PriceMonitoring
 
     public static function find(int $id): PriceRecord
     {
-        return PriceRecord::findOrFail($id);
+        $record = PriceRecord::findOrFail($id);
+        PriceArchives::assertEditable($record);
+
+        return $record;
     }
 
     public static function save(array $rows, User $actor, ?int $id = null): void
@@ -115,6 +120,8 @@ class PriceMonitoring
 
         try {
             DB::transaction(function () use ($rows, $id) {
+                // Share the archive snapshot lock so an edit cannot race membership capture.
+                DB::table('users')->orderBy('id')->lockForUpdate()->first();
                 foreach ($rows as $index => $data) {
                     // Normalize quantities and prices before computing the duplicate fingerprint.
                     $quantity = self::scaled($data['qty'], 3);
@@ -133,7 +140,10 @@ class PriceMonitoring
                     if ($exists) {
                         throw ValidationException::withMessages(['rows.'.$index.'.particulars' => __('Row :row already exists. Remove the duplicate or edit the existing record.', ['row' => $index + 1])]);
                     }
-                    $record = $id ? self::find($id) : new PriceRecord;
+                    $record = $id ? PriceRecord::whereKey($id)->lockForUpdate()->firstOrFail() : new PriceRecord;
+                    if ($id) {
+                        PriceArchives::assertEditable($record);
+                    }
                     $record->fill($data)->save();
                 }
             });
@@ -147,7 +157,12 @@ class PriceMonitoring
     {
         UserAccounts::authorize($actor, 'delete-data');
 
-        self::find($id)->delete();
+        DB::transaction(function () use ($id) {
+            DB::table('users')->orderBy('id')->lockForUpdate()->first();
+            $record = PriceRecord::whereKey($id)->lockForUpdate()->firstOrFail();
+            PriceArchives::assertEditable($record);
+            $record->delete();
+        });
         Log::info('price-monitoring.deleted', ['actor_id' => $actor->id, 'record_id' => $id]);
     }
 

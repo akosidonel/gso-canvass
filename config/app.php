@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'version' => is_file(base_path('VERSION')) ? trim(file_get_contents(base_path('VERSION'))) : '1.0.0',
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

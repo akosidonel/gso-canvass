@@ -42,7 +42,7 @@ test('Excel export includes every record regardless of pagination or search and 
     $this->actingAs(User::factory()->create(['role' => 'canvasser', 'is_active' => true]));
     $this->get('/price-monitoring?search=unmatched')->assertOk()
         ->assertSee('Export all to Excel')
-        ->assertSeeInOrder(['Export all to Excel', 'id="search"'], false)
+        ->assertSeeInOrder(['id="search"', 'Export all to Excel'], false)
         ->assertSee(route('price-monitoring.export'), false);
     $response = $this->get('/price-monitoring/export?search=unmatched&page=2')->assertOk()
         ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

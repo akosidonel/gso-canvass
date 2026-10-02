@@ -15,12 +15,18 @@ class PriceMonitoringController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:200'],
             'category' => ['nullable', 'string', 'max:255'],
+            'view' => ['nullable', 'in:active,archived'],
+            'year' => ['nullable', 'integer', 'min:1900', 'max:'.now()->year],
         ]);
         $search = $filters['search'] ?? '';
         $category = $filters['category'] ?? '';
+        $archived = ($filters['view'] ?? 'active') === 'archived';
+        $year = isset($filters['year']) ? (int) $filters['year'] : null;
 
         return view('pages.price-monitoring.index', [
-            'records' => PriceMonitoring::listing($search, $category), 'search' => $search,
+            'records' => PriceMonitoring::listing($search, $category, $archived, $year), 'search' => $search,
+            'archived' => $archived, 'year' => $year,
+            'years' => PriceRecord::whereNotNull('created_at')->selectRaw('DISTINCT SUBSTR(created_at, 1, 4) AS year')->orderByDesc('year')->pluck('year'),
             'category' => $category,
             'categories' => collect(PriceRecord::CATEGORIES)
                 ->merge(PriceRecord::query()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'))
@@ -62,9 +68,10 @@ class PriceMonitoringController extends Controller
         return $this->form(null, $rows);
     }
 
-    public function export(PriceMonitoringExport $export)
+    public function export(Request $request, PriceMonitoringExport $export)
     {
-        return response()->download($export->create(), 'price-monitoring-'.now()->format('Y-m-d-His').'.xlsx', [
+        $filters = $request->validate(['view' => ['nullable', 'in:active,archived'], 'year' => ['nullable', 'integer', 'min:1900', 'max:'.now()->year]]);
+        return response()->download($export->create(($filters['view'] ?? 'active') === 'archived', isset($filters['year']) ? (int) $filters['year'] : null), 'price-monitoring-'.now()->format('Y-m-d-His').'.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'private, no-store',
         ])->deleteFileAfterSend(true);

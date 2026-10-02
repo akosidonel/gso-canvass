@@ -31,6 +31,7 @@
                     <button type="submit" class="h-11 w-full rounded-lg bg-brand-500 text-sm font-medium text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:bg-brand-500 dark:hover:bg-brand-600">{{ __('Sign in') }}</button>
                 </form>
                 <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('For an account or password assistance, contact your System Admin.') }}</p>
+                <div class="mt-4 text-center"><x-common.app-version /></div>
             </section>
         </div>
         <aside aria-label="{{ __('General Services Office') }}" class="hidden w-1/2 flex-col items-center justify-center gap-8 border-s border-brand-100 bg-brand-50 px-12 py-16 lg:flex dark:border-gray-700 dark:bg-gray-800">

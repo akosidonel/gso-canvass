@@ -3,8 +3,14 @@
 @section('content')
 <x-common.page-breadcrumb :pageTitle="$title" />
 <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+    <div class="mb-4 flex flex-wrap items-center gap-4 text-sm">
+        <a href="{{ route('price-monitoring.index') }}" @class(['font-medium text-brand-600 dark:text-brand-400', 'underline underline-offset-4' => ! $archived])>{{ __('Active records') }}</a>
+        <a href="{{ route('price-monitoring.index', ['view' => 'archived']) }}" @class(['font-medium text-brand-600 dark:text-brand-400', 'underline underline-offset-4' => $archived])>{{ __('Archived records') }}</a>
+        @if ($archived)<span class="text-gray-500 dark:text-gray-400">{{ __('Archived records are read-only.') }}</span>@endif
+    </div>
     <div class="mb-5 flex flex-wrap items-center gap-3">
         <form method="GET" action="{{ route('price-monitoring.index') }}" x-data class="flex w-full flex-wrap items-center gap-3 xl:w-auto xl:flex-1">
+            <input type="hidden" name="view" value="{{ $archived ? 'archived' : 'active' }}">
             <div class="w-full sm:w-56">
                 <label for="category" class="sr-only">{{ __('Category') }}</label>
                 <select id="category" name="category" @change="$el.form.requestSubmit()" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
@@ -18,11 +24,18 @@
                 <label for="search" class="sr-only">{{ __('Search') }}</label>
                 <input id="search" name="search" value="{{ $search }}" maxlength="200" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
             </div>
+            <div class="w-full sm:w-32">
+                <label for="year" class="sr-only">{{ __('Year') }}</label>
+                <select id="year" name="year" @change="$el.form.requestSubmit()" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                    <option value="">{{ __('All years') }}</option>
+                    @foreach ($years as $option)<option value="{{ $option }}" @selected((string) $year === (string) $option)>{{ $option }}</option>@endforeach
+                </select>
+            </div>
             <button class="h-11 rounded-lg bg-brand-500 px-4 text-sm text-white hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600">{{ __('Search') }}</button>
-            <a href="{{ route('price-monitoring.index') }}" class="py-3 text-sm text-brand-600 dark:text-brand-400">{{ __('Clear') }}</a>
+            <a href="{{ route('price-monitoring.index', $archived ? ['view' => 'archived'] : []) }}" class="py-3 text-sm text-brand-600 dark:text-brand-400">{{ __('Clear') }}</a>
         </form>
         <div class="flex flex-wrap items-center gap-3 xl:ms-auto">
-            <a href="{{ route('price-monitoring.export') }}" class="inline-flex h-11 items-center gap-2 rounded-lg border border-brand-500 px-4 py-3 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-400 dark:text-brand-400 dark:hover:bg-brand-500/15">
+            <a href="{{ route('price-monitoring.export', array_filter(['view' => $archived ? 'archived' : 'active', 'year' => $year])) }}" class="inline-flex h-11 items-center gap-2 rounded-lg border border-brand-500 px-4 py-3 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-400 dark:text-brand-400 dark:hover:bg-brand-500/15">
                 <svg aria-hidden="true" class="h-5 w-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 3v12m-4-4 4 4 4-4M5 16v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4" />
                 </svg>
@@ -49,7 +62,7 @@
                 <thead class="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300">
                     <tr>
                         <th class="p-3 text-start font-medium">{{ __('Copy') }}</th>
-                        @can('edit-data')<th class="p-3 text-start">{{ __('Actions') }}</th>@endcan
+                        @if (! $archived && auth()->user()->can('edit-data'))<th class="p-3 text-start">{{ __('Actions') }}</th>@endif
                         @foreach ($fields as $label)<th class="whitespace-nowrap p-3 text-start font-medium">{{ __($label) }}</th>@endforeach
                     </tr>
                 </thead>
@@ -69,7 +82,7 @@
                                     </svg>
                                 </button>
                             </td>
-                            @can('edit-data')
+                            @if (! $archived && auth()->user()->can('edit-data'))
                                 <td class="p-3"><div class="flex items-center gap-3">
                                     <a href="{{ route('price-monitoring.edit', $record->id) }}" class="text-brand-600 dark:text-brand-400">{{ __('Edit') }}</a>
                                     @can('delete-data')
@@ -80,13 +93,13 @@
                                         </form>
                                     @endcan
                                 </div></td>
-                            @endcan
+                            @endif
                             @foreach ($fields as $key => $label)
                                 <td @class(['p-3', 'min-w-64 whitespace-pre-wrap' => in_array($key, ['particulars', 'store']), 'whitespace-nowrap' => !in_array($key, ['particulars', 'store']), 'tabular-nums' => in_array($key, ['qty', 'amount'])])>{{ $record->$key }}</td>
                             @endforeach
                         </tr>
                     @empty
-                        <tr><td colspan="{{ count($fields) + 1 + (auth()->user()->can('edit-data') ? 1 : 0) }}" class="p-10 text-center text-gray-500 dark:text-gray-400">{{ __('No canvass records found.') }}</td></tr>
+                        <tr><td colspan="{{ count($fields) + 1 + (! $archived && auth()->user()->can('edit-data') ? 1 : 0) }}" class="p-10 text-center text-gray-500 dark:text-gray-400">{{ __('No canvass records found.') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -225,4 +225,7 @@
             <span class="menu-item-text hidden [.sidebar-expanded_&]:block">{{ __('Sign out') }}</span>
         </button>
     </form>
+    <div class="shrink-0 pb-4 text-center">
+        <x-common.app-version />
+    </div>
 </aside>

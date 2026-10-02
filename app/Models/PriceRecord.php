@@ -35,6 +35,6 @@ class PriceRecord extends Model
 
     protected function casts(): array
     {
-        return ['qty' => 'decimal:3', 'amount' => 'decimal:2'];
+        return ['qty' => 'decimal:3', 'amount' => 'decimal:2', 'archived_at' => 'datetime'];
     }
 }

@@ -21,6 +21,7 @@ class User extends Authenticatable
         'edit-data' => ['system_admin', 'tl_canvasser'],
         'delete-data' => ['system_admin'],
         'manage-users' => ['system_admin'],
+        'manage-archives' => ['system_admin'],
     ];
 
     public function canAccessSystem(): bool

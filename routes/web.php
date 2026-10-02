@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PriceMonitoringController;
+use App\Http\Controllers\PriceArchiveController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,12 @@ Route::middleware(['auth', 'active', 'auth.session'])->group(function () {
     Route::prefix('price-monitoring')->name('price-monitoring.')->middleware('can:view-data')->group(function () {
         Route::get('/', [PriceMonitoringController::class, 'index'])->name('index');
         Route::get('/export', [PriceMonitoringController::class, 'export'])->name('export');
+        Route::middleware('can:manage-archives')->group(function () {
+            Route::get('/archives', [PriceArchiveController::class, 'index'])->name('archives.index');
+            Route::post('/archives', [PriceArchiveController::class, 'store'])->name('archives.store');
+            Route::post('/archives/{batch}/restore', [PriceArchiveController::class, 'restore'])->name('archives.restore');
+            Route::post('/archives/{batch}/retry', [PriceArchiveController::class, 'retry'])->name('archives.retry');
+        });
         Route::middleware('can:edit-data')->group(function () {
             Route::get('/create', [PriceMonitoringController::class, 'create'])->name('create');
             Route::post('/preview', [PriceMonitoringController::class, 'preparePreview'])->name('preview.prepare');

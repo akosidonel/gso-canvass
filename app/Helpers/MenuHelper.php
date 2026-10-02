@@ -8,6 +8,9 @@ class MenuHelper
     {
         return [
             ['icon' => 'tables', 'name' => __('Price Monitoring'), 'path' => '/price-monitoring'],
+            ...(auth()->user()?->can('manage-archives') ? [[
+                'icon' => 'pages', 'name' => __('Archive Management'), 'path' => '/price-monitoring/archives',
+            ]] : []),
             ...(auth()->user()?->can('manage-users') ? [[
                 'icon' => 'user-profile',
                 'name' => __('Administrator'),

@@ -13,7 +13,7 @@ class PriceMonitoringExport
 {
     private const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 
-    public function create(): string
+    public function create(bool $archived = false, ?int $year = null): string
     {
         $workbook = tempnam(sys_get_temp_dir(), 'price-xlsx-');
         $worksheet = tempnam(sys_get_temp_dir(), 'price-sheet-');
@@ -28,7 +28,7 @@ class PriceMonitoringExport
         }
 
         try {
-            $this->writeWorksheet($worksheet);
+            $this->writeWorksheet($worksheet, $archived, $year);
             $zip = new ZipArchive;
             if ($zip->open($workbook, ZipArchive::OVERWRITE) !== true) {
                 throw new RuntimeException('Could not create Excel archive.');
@@ -57,7 +57,7 @@ class PriceMonitoringExport
         return $workbook;
     }
 
-    private function writeWorksheet(string $path): void
+    private function writeWorksheet(string $path, bool $archived, ?int $year): void
     {
         $xml = new XMLWriter;
         if (! $xml->openUri($path)) {
@@ -90,7 +90,10 @@ class PriceMonitoringExport
         $this->writeRow($xml, 1, array_map(fn ($label) => __($label), PriceRecord::FIELDS), true);
         $row = 1;
         // Match the table's newest-first order, without pagination or search filters.
-        foreach (PriceRecord::query()->select(['id', ...array_keys(PriceRecord::FIELDS)])->lazyByIdDesc(1000) as $record) {
+        foreach (PriceRecord::query()
+            ->when($archived, fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
+            ->when($year, fn ($query) => $query->where('created_at', '>=', $year.'-01-01')->where('created_at', '<', ($year + 1).'-01-01'))
+            ->select(['id', ...array_keys(PriceRecord::FIELDS)])->lazyByIdDesc(1000) as $record) {
             if (++$row > 1048576) {
                 throw ValidationException::withMessages(['export' => __("The export exceeds Excel's worksheet row limit.")]);
             }

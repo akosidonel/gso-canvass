@@ -100,6 +100,10 @@ test('category migration preserves existing rows and supports rollback', functio
     $this->postJson('/price-monitoring', ['rows' => [categoryPriceRow()]])->assertOk();
     $record = PriceRecord::firstOrFail();
     $fingerprint = $record->fingerprint;
+    $uploadDates = require database_path('migrations/2026_10_02_000004_use_created_at_for_price_archives.php');
+    $uploadDates->down();
+    $archives = require database_path('migrations/2026_10_02_000003_add_price_record_archives.php');
+    $archives->down();
     $migration = require database_path('migrations/2026_10_02_000001_add_category_to_price_monitoring_records.php');
     $migration->down();
     $migration->up();
