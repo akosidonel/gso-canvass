@@ -10,6 +10,19 @@ export function pasteGridCells(rows, cells, rowIndex, columnIndex, columns) {
     return result;
 }
 
+export function pricePasteColumns(fields, layout) {
+    if (layout === 'workbook') return ['qty', 'unit', 'particulars', 'amount', 'department', 'control_number', 'item', 'brand_model', 'canvasser', 'canvass', 'store'];
+    return layout === 'system-category' ? fields : fields.filter(field => field !== 'category');
+}
+
+export function isPriceHeader(cells, columns) {
+    const quantity = columns.indexOf('qty');
+    const unit = columns.indexOf('unit');
+    return quantity >= 0 && unit >= 0
+        && /^(qty(?:\s*1)?|quantity)$/i.test(cells?.[quantity]?.trim() || '')
+        && /^(units?|qty\s*2)$/i.test(cells?.[unit]?.trim() || '');
+}
+
 export function createPricePasteGrid(editor, fields, parseRows, onChange, onError) {
     const root = editor.querySelector('[data-paste-grid]');
     if (!root) return null;
@@ -19,9 +32,7 @@ export function createPricePasteGrid(editor, fields, parseRows, onChange, onErro
     const head = root.querySelector('[data-paste-head]');
     const template = root.querySelector('[data-paste-cell-template]');
     let rows = Array.from({ length: 5 }, () => ({}));
-    const columns = () => selector.value === 'workbook'
-        ? ['qty', 'unit', 'particulars', 'amount', 'department', 'control_number', 'item', 'brand_model', 'canvasser', 'canvass', 'store']
-        : fields;
+    const columns = () => pricePasteColumns(fields, selector.value);
     const focus = (row, column) => body.children[row]?.querySelectorAll('textarea')[column]?.focus();
     const appendRow = (values, rowIndex) => {
         const tr = document.createElement('tr');
@@ -47,7 +58,7 @@ export function createPricePasteGrid(editor, fields, parseRows, onChange, onErro
                 if (!event.clipboardData) return;
                 event.preventDefault();
                 const cells = parseRows(event.clipboardData.getData('text/plain'), true);
-                if (columnIndex === 0 && /^(qty(?:\s*1)?|quantity)$/i.test(cells[0]?.[0]?.trim() || '') && /^(units?|qty\s*2)$/i.test(cells[0]?.[1]?.trim() || '')) cells.shift();
+                if (isPriceHeader(cells[0], columns().slice(columnIndex))) cells.shift();
                 if (!cells.length) return;
                 try {
                     rows = pasteGridCells(rows, cells, rowIndex, columnIndex, columns());

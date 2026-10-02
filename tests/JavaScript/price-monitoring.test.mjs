@@ -3,6 +3,22 @@ import { test } from 'node:test';
 globalThis.document = { addEventListener() {} };
 const { parseExcelRows, priceNumber, excelCell } = await import('../../resources/js/script.js');
 
+test('category imports preserve both existing Excel layouts and exported category columns', async () => {
+    const { pricePasteColumns, pasteGridCells, isPriceHeader } = await import('../../resources/js/components/price-paste-grid.js');
+    const fields = ['category', 'qty', 'unit', 'particulars', 'amount', 'department', 'control_number', 'brand_model', 'store', 'canvasser'];
+    assert.deepEqual(pricePasteColumns(fields, 'system'), fields.slice(1));
+    assert.deepEqual(pricePasteColumns(fields, 'system-category'), fields);
+    assert.deepEqual(pricePasteColumns(fields, 'workbook'), ['qty', 'unit', 'particulars', 'amount', 'department', 'control_number', 'item', 'brand_model', 'canvasser', 'canvass', 'store']);
+    const cells = parseExcelRows('Office Supplies\t1\tpcs\tPaper\t10.00\tGSO\t001-26\t\tShop\tStaff');
+    const row = pasteGridCells([], cells, 0, 0, pricePasteColumns(fields, 'system-category'))[0];
+    assert.equal(isPriceHeader(['Category', 'Qty', 'Unit'], fields), true);
+    assert.equal(isPriceHeader(['Qty', 'Unit'], fields.slice(1)), true);
+    assert.equal(isPriceHeader(cells[0], fields), false);
+    assert.equal(row.category, 'Office Supplies');
+    assert.equal(row.control_number, '001-26');
+    assert.equal(row.canvasser, 'Staff');
+});
+
 test('Excel rows preserve multiline cells, escaped quotes, empty cells, and leading zeros', () => {
     assert.deepEqual(parseExcelRows('2\tpcs\t"Paper\nA4 ""white"""\t001-26\t\r\n'), [['2', 'pcs', 'Paper\nA4 "white"', '001-26', '']]);
     assert.deepEqual(parseExcelRows('\r\n\t\r\n'), []);

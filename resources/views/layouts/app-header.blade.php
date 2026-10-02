@@ -50,7 +50,7 @@
 
             <!-- Logo (mobile only) -->
             <a href="/" class="xl:hidden">
-                <img class="h-12 w-12 object-contain" src="{{ asset('images/logo/gso.png') }}" alt="{{ __('GSO Monitoring') }}" width="48" height="48" />
+                <img class="h-12 w-12 object-contain" src="{{ asset('images/logo/gso.png') }}" alt="{{ __('GSO Price Monitoring System') }}" width="48" height="48" />
             </a>
 
             <!-- Application Menu Toggle (mobile only) -->

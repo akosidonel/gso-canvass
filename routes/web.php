@@ -18,8 +18,11 @@ Route::middleware(['auth', 'active', 'auth.session'])->group(function () {
         ->except('show')->middleware('can:manage-users');
     Route::prefix('price-monitoring')->name('price-monitoring.')->middleware('can:view-data')->group(function () {
         Route::get('/', [PriceMonitoringController::class, 'index'])->name('index');
+        Route::get('/export', [PriceMonitoringController::class, 'export'])->name('export');
         Route::middleware('can:edit-data')->group(function () {
             Route::get('/create', [PriceMonitoringController::class, 'create'])->name('create');
+            Route::post('/preview', [PriceMonitoringController::class, 'preparePreview'])->name('preview.prepare');
+            Route::get('/preview', [PriceMonitoringController::class, 'preview'])->name('preview');
             Route::post('/', [PriceMonitoringController::class, 'store'])->name('store');
             Route::get('/{id}/edit', [PriceMonitoringController::class, 'edit'])->whereNumber('id')->name('edit');
             Route::put('/{id}', [PriceMonitoringController::class, 'update'])->whereNumber('id')->name('update');

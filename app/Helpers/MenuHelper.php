@@ -7,7 +7,7 @@ class MenuHelper
     public static function getMainNavItems()
     {
         return [
-            ['icon' => 'tables', 'name' => __('Price Monitoring Canvass'), 'path' => '/price-monitoring'],
+            ['icon' => 'tables', 'name' => __('Price Monitoring'), 'path' => '/price-monitoring'],
             ...(auth()->user()?->can('manage-users') ? [[
                 'icon' => 'user-profile',
                 'name' => __('Administrator'),

@@ -1,4 +1,4 @@
-import { createPricePasteGrid } from './components/price-paste-grid.js';
+import { createPricePasteGrid, pricePasteColumns, isPriceHeader } from './components/price-paste-grid.js';
 
 const showPriceAlert = async options => {
     const { default: Swal } = await import('sweetalert2');
@@ -191,6 +191,73 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const pastePage = document.querySelector('[data-price-paste]');
+    if (pastePage) {
+        const fields = JSON.parse(pastePage.dataset.fields);
+        const messages = JSON.parse(pastePage.dataset.messages);
+        const translate = key => messages[key] || key;
+        const status = pastePage.querySelector('[data-editor-status]');
+        const blank = pastePage.querySelector('[data-preview-blank]');
+        let dirty = false, opening = false;
+        const grid = createPricePasteGrid(pastePage, fields, parseExcelRows, () => {
+            dirty = true;
+            blank.disabled = grid.hasContent();
+        }, error => {
+            status.textContent = translate(error === 'rows' ? 'Use at most 500 rows per batch.' : 'The pasted cells do not fit. Check the selected column order or start in an earlier column.');
+        });
+        const openPreview = async rows => {
+            if (opening) return;
+            opening = true;
+            status.textContent = '';
+            const controls = [...pastePage.querySelectorAll('button, textarea, select')];
+            controls.forEach(control => { control.disabled = true; });
+            try {
+                const response = await fetch(pastePage.dataset.previewUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                    body: JSON.stringify({ rows }),
+                });
+                if ([401, 419].includes(response.status) || response.redirected) {
+                    status.textContent = translate('Your session expired. Sign in again in another tab, then retry.'); return;
+                }
+                const result = await response.json();
+                if (!response.ok) {
+                    status.textContent = Object.values(result.errors || {}).flat().join('\n') || translate('Unable to open preview. Your pasted rows are still here; try again.'); return;
+                }
+                dirty = false;
+                window.location.assign(result.redirect);
+            } catch {
+                status.textContent = translate('Unable to open preview. Your pasted rows are still here; try again.');
+            } finally {
+                opening = false;
+                controls.forEach(control => { control.disabled = false; });
+                blank.disabled = grid.hasContent();
+            }
+        };
+        pastePage.querySelector('[data-preview-paste]').addEventListener('click', () => {
+            const cells = grid.getRows();
+            const layout = pricePasteColumns(fields, pastePage.querySelector('[data-paste-layout]').value);
+            if (isPriceHeader(cells[0], layout)) cells.shift();
+            if (!cells.length) { status.textContent = translate('Paste copied Excel rows first.'); return; }
+            if (cells.length > 500) { status.textContent = translate('Use at most 500 rows per batch.'); return; }
+            if (cells.some(row => row.length !== layout.length)) {
+                status.textContent = translate('Each row must have :count columns. Check the selected column order.').replace(':count', layout.length); return;
+            }
+            const rows = cells.map(row => {
+                const values = {};
+                layout.forEach((field, index) => {
+                    if (fields.includes(field)) values[field] = ['qty', 'amount'].includes(field) ? priceNumber(row[index]) : row[index].trim();
+                });
+                return values;
+            });
+            openPreview(rows);
+        });
+        blank.addEventListener('click', () => openPreview([{}]));
+        window.addEventListener('beforeunload', event => {
+            if (dirty) { event.preventDefault(); event.returnValue = ''; }
+        });
+    }
+
     const editor = document.querySelector('[data-price-editor]');
     if (!editor) return;
     const messages = JSON.parse(editor.dataset.messages);
@@ -201,11 +268,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const status = editor.querySelector('[data-editor-status]');
     const save = editor.querySelector('[data-save-rows]');
     let dirty = false, saving = false;
+    const categoryOptions = [...template.content.querySelector('[data-field="category"]').options]
+        .filter(option => option.value).map(option => ({ value: option.value, label: option.textContent }));
+    const fillCategories = select => {
+        categoryOptions.forEach(category => {
+            if ([...select.options].some(option => option.value === category.value)) return;
+            const option = document.createElement('option');
+            option.value = category.value;
+            option.textContent = category.label;
+            select.insertBefore(option, select.querySelector('[data-add-category]'));
+        });
+    };
+    const registerCategory = value => {
+        const name = value.trim();
+        if (!name) return '';
+        const existing = categoryOptions.find(option => option.value.toLocaleLowerCase() === name.toLocaleLowerCase());
+        if (existing) return existing.value;
+        categoryOptions.push({ value: name, label: name });
+        body.querySelectorAll('[data-field="category"]').forEach(fillCategories);
+        return name;
+    };
     const renumber = () => [...body.children].forEach((row, index) => { row.querySelector('[data-row-number]').textContent = index + 1; });
     const addRow = (values = {}) => {
         const row = template.content.firstElementChild.cloneNode(true);
         row.querySelectorAll('[data-field]').forEach(input => {
-            input.value = values[input.dataset.field] ?? '';
+            if (input.dataset.field === 'category') {
+                const value = registerCategory(values.category ?? '');
+                fillCategories(input);
+                input.value = value;
+                let previous = value;
+                input.addEventListener('change', async () => {
+                    if (!input.selectedOptions[0]?.hasAttribute('data-add-category')) {
+                        previous = input.value;
+                        return;
+                    }
+                    input.value = previous;
+                    const result = await showPriceAlert({
+                        titleText: translate('Add new category'),
+                        input: 'text',
+                        inputLabel: translate('Category name'),
+                        inputAttributes: { maxlength: '255' },
+                        showCancelButton: true,
+                        confirmButtonText: translate('Add category'),
+                        cancelButtonText: translate('Cancel'),
+                        inputValidator: value => {
+                            if (!value.trim()) return translate('Enter a category name.');
+                            if ([...value.trim()].length > 255) return translate('Use at most 255 characters.');
+                        },
+                    });
+                    if (!result.isConfirmed) return;
+                    input.value = registerCategory(result.value);
+                    previous = input.value;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            } else input.value = values[input.dataset.field] ?? '';
             input.addEventListener('input', () => {
                 dirty = true; input.removeAttribute('aria-invalid');
                 input.classList.remove('ring-2', 'ring-error-500');
@@ -216,41 +332,17 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const initial = JSON.parse(editor.dataset.record);
     if (initial) { addRow(initial); renumber(); }
-    const pasteGrid = createPricePasteGrid(editor, fields, parseExcelRows, () => { dirty = true; }, error => {
-        status.textContent = translate(error === 'rows' ? 'Use at most 500 rows per batch.' : 'The pasted cells do not fit. Check the selected column order or start in an earlier column.');
-    });
+    const staged = JSON.parse(editor.dataset.initialRows || '[]');
+    staged.forEach(addRow);
+    if (staged.length) { dirty = true; renumber(); }
     editor.querySelector('[data-add-row]')?.addEventListener('click', () => {
         if (body.children.length >= 500) { status.textContent = translate('Use at most 500 rows per batch.'); return; }
         addRow(); dirty = true; renumber();
-    });
-    editor.querySelector('[data-preview-paste]')?.addEventListener('click', () => {
-        const rows = pasteGrid.getRows();
-        if (!rows.length) { status.textContent = translate('Paste copied Excel rows first.'); return; }
-        const workbook = editor.querySelector('[data-paste-layout]').value === 'workbook';
-        const layout = workbook
-            ? ['qty', 'unit', 'particulars', 'amount', 'department', 'control_number', null, 'brand_model', 'canvasser', null, 'store']
-            : fields;
-        if (/^(qty(?:\s*1)?|quantity)$/i.test(rows[0][0].trim()) && /^(unit(?:s)?|qty\s*2)$/i.test(rows[0][1]?.trim() || '')) rows.shift();
-        if (!rows.length) { status.textContent = translate('Paste copied Excel rows first.'); return; }
-        if (rows.length + body.children.length > 500) { status.textContent = translate('Use at most 500 rows per batch.'); return; }
-        if (rows.some(row => row.length !== layout.length)) {
-            status.textContent = translate('Each row must have :count columns. Check the selected column order.').replace(':count', layout.length); return;
-        }
-        rows.forEach(cells => {
-            const values = {};
-            layout.forEach((key, index) => { if (key) values[key] = cells[index].trim(); });
-            values.qty = priceNumber(values.qty); values.amount = priceNumber(values.amount);
-            addRow(values);
-        });
-        dirty = true; renumber(); pasteGrid.clear();
-        status.textContent = translate('Preview ready. Review the rows before saving.');
     });
     save.addEventListener('click', async () => {
         if (saving) return;
         const rows = [...body.children].map(row => Object.fromEntries([...row.querySelectorAll('[data-field]')].map(input => [input.dataset.field, ['qty', 'amount'].includes(input.dataset.field) ? priceNumber(input.value) : input.value.trim()])));
         if (!rows.length) { status.textContent = translate('No rows to save.'); return; }
-        // Pending pasted content must be previewed before saving.
-        if (pasteGrid?.hasContent()) { status.textContent = translate('Add the pasted rows to the preview before saving.'); return; }
         editor.querySelectorAll('[aria-invalid]').forEach(input => { input.removeAttribute('aria-invalid'); input.classList.remove('ring-2', 'ring-error-500'); });
         saving = true;
         const controls = [...editor.querySelectorAll('button, input, textarea, select')];

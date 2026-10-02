@@ -38,7 +38,7 @@ test('canvassers can search and copy but cannot change records', function () {
 
 test('TL can paste a batch and edit without a total column', function () {
     $this->actingAs(priceActor('tl_canvasser'));
-    $this->get('/price-monitoring/create')->assertOk()->assertSee('data-price-editor', false);
+    $this->get('/price-monitoring/create')->assertOk()->assertSee('data-price-paste', false);
     $this->postJson('/price-monitoring', ['rows' => [priceRow(), priceRow(['particulars' => 'Second item'])]])->assertOk();
     $this->assertDatabaseCount('price_monitoring_records', 2);
     expect(\Illuminate\Support\Facades\Schema::hasColumn('price_monitoring_records', 'total'))->toBeFalse();
@@ -102,4 +102,42 @@ test('removing total preserves existing records and duplicate detection', functi
     $this->assertDatabaseCount('price_monitoring_records', 1);
     $this->get('/price-monitoring')->assertOk()->assertDontSee('>Total<', false);
     $this->get('/price-monitoring/'.$record->id.'/edit')->assertOk()->assertDontSee('data-field="total"', false);
+});
+
+test('repairing the legacy brand column preserves records and allows saving and searching', function () {
+    $this->actingAs(priceActor('system_admin'));
+    $this->postJson('/price-monitoring', ['rows' => [priceRow()]])->assertOk();
+    $record = \App\Models\PriceRecord::firstOrFail();
+
+    \Illuminate\Support\Facades\Schema::table('price_monitoring_records', function ($table) {
+        $table->renameColumn('brand_model', 'brand/model');
+    });
+    $migration = require database_path('migrations/2026_10_01_000001_normalize_brand_model_in_price_monitoring_records.php');
+    $migration->up();
+    $migration->up();
+
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('price_monitoring_records', 'brand/model'))->toBeFalse();
+    $this->assertDatabaseHas('price_monitoring_records', [
+        'id' => $record->id, 'brand_model' => 'Sample brand', 'fingerprint' => $record->fingerprint,
+    ]);
+    $this->get('/price-monitoring?search=Sample%20brand')->assertOk()->assertSee('Sample brand');
+    $this->postJson('/price-monitoring', ['rows' => [priceRow()]])->assertUnprocessable();
+    $this->postJson('/price-monitoring', ['rows' => [priceRow(['brand_model' => '', 'particulars' => 'Coco Lumber 2x3x12'])]])->assertOk();
+    $this->postJson('/price-monitoring', ['rows' => [priceRow(['brand_model' => str_repeat('B', 255)])]])->assertOk();
+    $this->assertDatabaseCount('price_monitoring_records', 3);
+});
+
+test('repairing a missing brand column keeps existing records', function () {
+    $this->actingAs(priceActor('system_admin'));
+    $this->postJson('/price-monitoring', ['rows' => [priceRow(['brand_model' => ''])]])->assertOk();
+    \Illuminate\Support\Facades\Schema::table('price_monitoring_records', function ($table) {
+        $table->dropColumn('brand_model');
+    });
+
+    $migration = require database_path('migrations/2026_10_01_000001_normalize_brand_model_in_price_monitoring_records.php');
+    $migration->up();
+
+    $this->assertDatabaseHas('price_monitoring_records', ['id' => 1, 'brand_model' => null]);
+    $this->postJson('/price-monitoring', ['rows' => [priceRow()]])->assertOk();
+    $this->assertDatabaseCount('price_monitoring_records', 2);
 });

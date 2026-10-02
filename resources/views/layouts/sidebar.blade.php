@@ -59,10 +59,10 @@
     <div class="pt-8 pb-7 flex items-center gap-2" :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-between'">
         <a href="/">
             <div class="hidden items-center gap-3 [.sidebar-expanded_&]:flex">
-                <img class="h-14 w-14 shrink-0 object-contain" src="{{ asset('images/logo/gso.png') }}" alt="{{ __('GSO Monitoring') }}" width="56" height="56" />
-                <span class="text-lg font-semibold text-brand-600 dark:text-brand-400">{{ __('GSO Monitoring') }}</span>
+                <img class="h-14 w-14 shrink-0 object-contain" src="{{ asset('images/logo/gso.png') }}" alt="{{ __('GSO Price Monitoring System') }}" width="56" height="56" />
+                <span class="text-lg font-semibold text-brand-600 dark:text-brand-400">{{ __('GSO Price Monitoring System') }}</span>
             </div>
-            <img class="block h-10 w-10 object-contain [.sidebar-expanded_&]:hidden" src="{{ asset('images/logo/gso.png') }}" alt="{{ __('GSO Monitoring') }}" width="40" height="40" />
+            <img class="block h-10 w-10 object-contain [.sidebar-expanded_&]:hidden" src="{{ asset('images/logo/gso.png') }}" alt="{{ __('GSO Price Monitoring System') }}" width="40" height="40" />
         </a>
     </div>
 

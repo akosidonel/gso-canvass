@@ -91,16 +91,17 @@ class UserAccounts
 
 class PriceMonitoring
 {
-    public static function listing(string $search)
+    public static function listing(string $search, string $category = '')
     {
         return PriceRecord::query()
+            ->when($category !== '', fn ($query) => $query->where('category', $category))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
-                    foreach (['particulars', 'brand_model', 'department', 'control_number', 'store', 'canvasser'] as $field) {
+                    foreach (['particulars', 'brand_model', 'department', 'control_number', 'store', 'canvasser', 'category'] as $field) {
                         $query->orWhere($field, 'like', '%'.$search.'%');
                     }
                 });
-            })->latest('id')->paginate(25)->withQueryString();
+            })->latest('id')->paginate(15)->withQueryString();
     }
 
     public static function find(int $id): PriceRecord
